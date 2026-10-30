@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forged-carbon-mold"
+version = "0.1.0"
+description = "Lokale CAD-Anwendung zur Konstruktion mehrteiliger Forged-Carbon-Pressformen"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "cadquery==2.6.1",
+    "fastapi==0.115.12",
+    "python-multipart==0.0.20",
+    "uvicorn[standard]==0.34.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.5", "httpx==0.28.1"]
+
+[project.scripts]
+forged-carbon-mold = "forged_carbon_mold.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+forged_carbon_mold = ["static/*.html", "static/*.css", "static/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forged Carbon Mold</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">LOKALES CAD · STEP → PRESSFORM</span><h1>Forged Carbon <span>Mold</span></h1></div>
+    <div class="header-actions">
+      <button id="open-project">Projekt öffnen</button><button id="save-project">Projekt speichern</button>
+      <input id="project-file" type="file" accept=".fcm" hidden>
+    </div>
+  </header>
+  <main>
+    <aside class="workflow">
+      <div class="section-title">ARBEITSSCHRITTE</div>
+      <ol>
+        <li class="active"><b>01</b><span>Bauteil importieren</span></li>
+        <li><b>02</b><span>Bauteillage</span></li>
+        <li><b>03</b><span>Außenform</span></li>
+        <li><b>04</b><span>Trennung</span></li>
+        <li class="disabled"><b>05</b><span>Verbindungen <small>Offen</small></span></li>
+        <li class="disabled"><b>06</b><span>Keilansätze <small>Offen</small></span></li>
+      </ol>
+      <div class="notice"><strong>M0 / M1</strong><br>STEP importieren, Bauteil transformieren und eine echte zweiteilige CAD-Form berechnen.</div>
+      <label class="upload" for="step-file"><span>STEP-Datei auswählen</span><small>.step / .stp · max. 100 MB</small></label>
+      <input id="step-file" type="file" accept=".step,.stp" hidden>
+      <button class="secondary full" id="demo">Referenzkörper laden</button>
+    </aside>
+    <section class="viewport">
+      <div class="viewport-top"><span id="model-name">Kein Bauteil geladen</span><div><button id="show-part" class="view-toggle selected">Bauteil</button><button id="show-mold" class="view-toggle">Form</button></div></div>
+      <canvas id="viewer" aria-label="Interaktive CAD-Vorschau"></canvas>
+      <div id="empty-state"><div class="cube-icon">◇</div><h2>Dein Bauteil. Deine Form.</h2><p>STEP-Datei importieren oder den Referenzkörper laden, um den CAD-Kern zu testen.</p></div>
+      <div class="view-help">Ziehen: Ansicht drehen <span>·</span> Mausrad: Zoom</div>
+      <div class="viewport-bottom"><span id="dimensions">—</span><span id="solid-count">—</span></div>
+    </section>
+    <aside class="parameters">
+      <div class="section-title">BAUTEILTRANSFORMATION</div>
+      <p class="hint">Rotation um den Ursprung in Reihenfolge X → Y → Z, danach Verschiebung. Werkzeugachsen bleiben fest.</p>
+      <div class="field-grid">
+        <label>X <input type="number" step="1" id="tx" value="0"> <i>mm</i></label>
+        <label>Y <input type="number" step="1" id="ty" value="0"> <i>mm</i></label>
+        <label>Z <input type="number" step="1" id="tz" value="0"> <i>mm</i></label>
+        <label>Rot. X <input type="number" step="1" id="rx" value="0"> <i>°</i></label>
+        <label>Rot. Y <input type="number" step="1" id="ry" value="0"> <i>°</i></label>
+        <label>Rot. Z <input type="number" step="1" id="rz" value="0"> <i>°</i></label>
+      </div>
+      <button id="apply-transform" class="secondary full" disabled>Transformation anwenden</button>
+      <div class="divider"></div>
+      <div class="section-title">FORMPARAMETER</div>
+      <label class="wide-field">Werkzeugwandstärke<input id="wall" type="number" min="1" max="500" step="1" value="20"><i>mm</i></label>
+      <label class="wide-field">Trennebene Z<input id="split" type="number" step="1" value="0"><i>mm</i></label>
+      <p class="hint">Quader-Rohling mit fester Werkzeugausrichtung. Die Form wird aus dem Rohling und der unveränderten STEP-Geometrie ausgeschnitten.</p>
+      <button id="build" class="primary full" disabled>Form berechnen <span>→</span></button>
+      <div class="divider"></div>
+      <div class="section-title">SEGMENTE</div>
+      <div id="segments" class="segments"><span class="muted">Noch nicht berechnet</span></div>
+      <div class="export-row"><button data-export="lower" disabled>Unterform STEP ↓</button><button data-export="upper" disabled>Oberform STEP ↓</button></div>
+      <button data-export="assembly" disabled class="secondary full">Baugruppe STEP exportieren</button>
+    </aside>
+  </main>
+  <footer><span id="status">Bereit</span><span>Alle Maße in mm · CAD-Berechnung lokal · STEP-Export als B-Rep</span></footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

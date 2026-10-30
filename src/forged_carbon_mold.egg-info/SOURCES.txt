@@ -1,0 +1,10 @@
+pyproject.toml
+src/forged_carbon_mold/__init__.py
+src/forged_carbon_mold/__main__.py
+src/forged_carbon_mold/cad.py
+src/forged_carbon_mold.egg-info/PKG-INFO
+src/forged_carbon_mold.egg-info/SOURCES.txt
+src/forged_carbon_mold.egg-info/dependency_links.txt
+src/forged_carbon_mold.egg-info/entry_points.txt
+src/forged_carbon_mold.egg-info/requires.txt
+src/forged_carbon_mold.egg-info/top_level.txt
