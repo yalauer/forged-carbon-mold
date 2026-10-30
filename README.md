@@ -24,9 +24,13 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m forged_carbon_mold
 ```
 
-Danach `http://127.0.0.1:8765` im Browser öffnen. Die Anwendung bindet
-standardmäßig ausschließlich an die Loopback-Adresse. Für einen direkten
-Start nach der Installation kann `START.bat` verwendet werden.
+Die Anwendung bindet standardmäßig ausschließlich an die Loopback-Adresse.
+Für den Start nach der Installation `START.bat` doppelklicken. Das Skript
+startet den Server in einem eigenen sichtbaren Konsolenfenster, wartet auf
+seine Bereitschaft und öffnet anschließend den Browser. Das Serverfenster
+muss geöffnet bleiben; wird es geschlossen, stoppt auch die Anwendung.
+Alternativ lässt sich `http://127.0.0.1:8765` nach dem manuellen Start im
+Browser öffnen.
 
 ## Aktueller Umfang
 
