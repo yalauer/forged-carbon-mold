@@ -41,9 +41,11 @@ Browser öffnen.
   die Werkzeugachsen werden dabei nicht transformiert.
 - Quaderförmiger Rohling mit einstellbarer Wandstärke und ebener Teilung in
   Unter- und Oberform.
-- Interaktive tessellierte 3D-Vorschau; echter STEP-Export der beiden
-  Segmente und der Baugruppe. Export prüft nach erneutem Einlesen Körperzahl,
-  Volumen und Lage/Abmessungen.
+- GPU-beschleunigte interaktive WebGL-Vorschau der einmal geladenen
+  CAD-Netze; Drehen und Zoomen aktualisieren nur die Ansicht, nicht erneut
+  die Geometrie. Echter STEP-Export der beiden Segmente und der Baugruppe.
+  Export prüft nach erneutem Einlesen Körperzahl, Volumen und
+  Lage/Abmessungen.
 - Projektdatei `.fcm` mit den ursprünglichen STEP-Daten und den Parametern;
   beim Öffnen werden CAD-Körper erneut aus der Quelldatei rekonstruiert.
 
