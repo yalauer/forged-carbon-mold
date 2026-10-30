@@ -31,10 +31,35 @@
       <button class="secondary full" id="demo">Referenzkörper laden</button>
     </aside>
     <section class="viewport">
-      <div class="viewport-top"><span id="model-name">Kein Bauteil geladen</span><div><button id="show-part" class="view-toggle selected">Bauteil</button><button id="show-mold" class="view-toggle">Form</button></div></div>
+      <div class="viewport-top">
+        <span id="model-name">Kein Bauteil geladen</span>
+        <div class="view-controls" aria-label="3D-Ansichtsoptionen">
+          <div class="view-modes">
+            <button id="show-part" class="view-toggle selected" aria-pressed="true">Bauteil</button>
+            <button id="show-mold" class="view-toggle" aria-pressed="false" disabled>Form</button>
+            <button id="show-both" class="view-toggle" aria-pressed="false" disabled>Beides</button>
+          </div>
+          <button id="transparent-toggle" class="view-toggle view-option" aria-pressed="false" disabled>Transparent</button>
+          <button id="grid-toggle" class="view-toggle view-option" aria-pressed="false" disabled>Gitter</button>
+        </div>
+      </div>
       <canvas id="viewer" aria-label="Interaktive CAD-Vorschau"></canvas>
       <div id="empty-state"><div class="cube-icon">◇</div><h2>Dein Bauteil. Deine Form.</h2><p>STEP-Datei importieren oder den Referenzkörper laden, um den CAD-Kern zu testen.</p></div>
-      <div class="view-help">Ziehen: Ansicht drehen <span>·</span> Mausrad: Zoom</div>
+      <div class="view-help">Ziehen: Ansicht invertiert drehen <span>·</span> Mausrad: Zoom</div>
+      <svg class="axis-indicator" viewBox="0 0 68 68" role="img" aria-label="Koordinatensystem: X rot, Y grün, Z blau">
+        <defs>
+          <marker id="axis-arrow-x" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#ef6a62"></path></marker>
+          <marker id="axis-arrow-y" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#91cf6b"></path></marker>
+          <marker id="axis-arrow-z" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#64a9f6"></path></marker>
+        </defs>
+        <line id="axis-x" x1="34" y1="37" x2="56" y2="37" stroke="#ef6a62" marker-end="url(#axis-arrow-x)"></line>
+        <line id="axis-y" x1="34" y1="37" x2="12" y2="37" stroke="#91cf6b" marker-end="url(#axis-arrow-y)"></line>
+        <line id="axis-z" x1="34" y1="37" x2="34" y2="15" stroke="#64a9f6" marker-end="url(#axis-arrow-z)"></line>
+        <circle cx="34" cy="37" r="2" fill="#e9eee9"></circle>
+        <text id="axis-label-x" fill="#ef6a62">X</text>
+        <text id="axis-label-y" fill="#91cf6b">Y</text>
+        <text id="axis-label-z" fill="#64a9f6">Z</text>
+      </svg>
       <div class="viewport-bottom"><span id="dimensions">—</span><span id="solid-count">—</span></div>
     </section>
     <aside class="parameters">

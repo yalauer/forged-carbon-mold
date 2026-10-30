@@ -43,9 +43,13 @@ Browser öffnen.
   Unter- und Oberform.
 - GPU-beschleunigte interaktive WebGL-Vorschau der einmal geladenen
   CAD-Netze; Drehen und Zoomen aktualisieren nur die Ansicht, nicht erneut
-  die Geometrie. Echter STEP-Export der beiden Segmente und der Baugruppe.
-  Export prüft nach erneutem Einlesen Körperzahl, Volumen und
-  Lage/Abmessungen.
+  die Geometrie. Die Ansicht wird mit invertierter Maussteuerung gedreht.
+  Bauteil, Form oder beide zusammen lassen sich umschalten; Transparenz und
+  eine Konturansicht mit Außen- und scharfen Formkanten statt interner
+  Dreiecksverbindungen sind zuschaltbar. Eine mit der Ansicht mitdrehende
+  XYZ-Markierung zeigt die Achsenorientierung. Echter
+  STEP-Export der beiden Segmente und der Baugruppe. Export prüft nach erneutem
+  Einlesen Körperzahl, Volumen und Lage/Abmessungen.
 - Projektdatei `.fcm` mit den ursprünglichen STEP-Daten und den Parametern;
   beim Öffnen werden CAD-Körper erneut aus der Quelldatei rekonstruiert.
 
