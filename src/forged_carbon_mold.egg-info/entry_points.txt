@@ -1,2 +1,0 @@
-[console_scripts]
-forged-carbon-mold = forged_carbon_mold.__main__:main

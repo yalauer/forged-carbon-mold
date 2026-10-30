@@ -6,5 +6,6 @@ __pycache__/
 *.step
 *.stp
 *.cad-project.json
+*.egg-info/
 dist/
 build/
