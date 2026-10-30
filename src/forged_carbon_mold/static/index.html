@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Forged Carbon Mold</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
   <header>
@@ -17,13 +17,13 @@
   <main>
     <aside class="workflow">
       <div class="section-title">ARBEITSSCHRITTE</div>
-      <ol>
-        <li class="active"><b>01</b><span>Bauteil importieren</span></li>
-        <li><b>02</b><span>Bauteillage</span></li>
-        <li><b>03</b><span>Außenform</span></li>
-        <li><b>04</b><span>Trennung</span></li>
-        <li class="disabled"><b>05</b><span>Verbindungen <small>Offen</small></span></li>
-        <li class="disabled"><b>06</b><span>Keilansätze <small>Offen</small></span></li>
+      <ol aria-label="Arbeitsschritte">
+        <li class="active"><button id="step-1" data-step="1" aria-controls="panel-1" aria-current="step"><b>01</b><span>Import</span></button></li>
+        <li><button id="step-2" data-step="2" aria-controls="panel-2" disabled><b>02</b><span>Bauteillage</span></button></li>
+        <li><button id="step-3" data-step="3" aria-controls="panel-3" disabled><b>03</b><span>Außenform</span></button></li>
+        <li><button id="step-4" data-step="4" aria-controls="panel-4" disabled><b>04</b><span>Stempeltiefe</span></button></li>
+        <li><button id="step-5" data-step="5" aria-controls="panel-5" disabled><b>05</b><span>Verbindungen</span></button></li>
+        <li><button id="step-6" data-step="6" aria-controls="panel-6" disabled><b>06</b><span>Keilansätze</span></button></li>
       </ol>
       <div class="notice"><strong>M0 / M1</strong><br>STEP importieren, Bauteil transformieren und eine echte zweiteilige CAD-Form berechnen.</div>
       <label class="upload" for="step-file"><span>STEP-Datei auswählen</span><small>.step / .stp · max. 100 MB</small></label>
@@ -65,6 +65,14 @@
       <div class="viewport-bottom"><span id="dimensions">—</span><span id="solid-count">—</span></div>
     </section>
     <aside class="parameters">
+      <section id="panel-1" class="step-panel" aria-labelledby="step-1" tabindex="-1">
+        <h2 class="section-title">01 · BAUTEIL IMPORTIEREN</h2>
+        <p class="hint">Lade eine STEP-Datei oder starte mit dem Referenzkörper links. Danach kannst du die Bauteillage, Form und optionalen Verbindungen festlegen.</p>
+        <button id="import-picker" class="secondary full">STEP-Datei auswählen</button>
+        <button id="import-demo" class="secondary full">Referenzkörper laden</button>
+        <p class="hint import-help">Die gleichen Importaktionen findest du jederzeit in der linken Seitenleiste. Alle Maße werden in mm verwendet.</p>
+      </section>
+      <section id="panel-2" class="step-panel" aria-labelledby="step-2" tabindex="-1" hidden>
       <div class="section-title">BAUTEILTRANSFORMATION</div>
       <p class="hint">Rotation um den Ursprung in Reihenfolge X → Y → Z, danach Verschiebung. Werkzeugachsen bleiben fest.</p>
       <div class="field-grid">
@@ -76,20 +84,52 @@
         <label>Rot. Z <input type="number" step="1" id="rz" value="0"> <i>°</i></label>
       </div>
       <button id="apply-transform" class="secondary full" disabled>Transformation anwenden</button>
+      </section>
+      <section id="panel-3" class="step-panel" aria-labelledby="step-3" tabindex="-1" hidden>
+      <h2 class="section-title">03 · AUSSENFORM</h2>
+      <label class="wide-field">Werkzeugwandstärke<input id="wall" type="number" min="1" max="500" step="any" value="20"><i>mm</i></label>
+      <p class="hint">Die Wandstärke legt den Materialrand um das Bauteil fest. Plane genügend Platz für optionale Bohrungen und Keilaufnahmen ein.</p>
+      </section>
+      <section id="panel-4" class="step-panel" aria-labelledby="step-4" tabindex="-1" hidden>
+      <h2 class="section-title">04 · STEMPELTIEFE</h2>
+      <label class="wide-field">Stempeltiefe<input id="punch-depth" type="number" min="0.1" max="500" step="any" value="10"><i>mm</i></label>
+      <p class="hint">Abstand vom höchsten Bauteilpunkt zur Oberkante der Unterform. Das gesamte Bauteil liegt in der Unterform. Der Stempel folgt der Z-Kontur und formt mit seiner Unterseite die Bauteiloberseite.</p>
+      <p class="hint">Senkrechte Führungskontur: 0,01 mm Polygonisierung, 0,05 mm Innenversatz. Formgebende Flächen werden aus der STEP-Geometrie geschnitten.</p>
+      </section>
+      <section id="panel-5" class="step-panel" aria-labelledby="step-5" tabindex="-1" hidden>
+        <h2 class="section-title">05 · VERBINDUNGEN</h2>
+        <label class="wide-field">Verbindungsart<select id="connection-mode"><option value="none" selected>Keine</option><option value="bolts">Schraubenbohrungen</option><option value="pins">Passstiftbohrungen</option><option value="both">Schrauben und Passstifte</option></select></label>
+        <label class="wide-field">Schraubenbohrung Ø<input id="bolt-diameter" type="number" min="0.1" max="100" step="any" value="6"><i>mm</i></label>
+        <label class="wide-field">Passstiftbohrung Ø<input id="pin-diameter" type="number" min="0.1" max="100" step="any" value="4"><i>mm</i></label>
+        <label class="wide-field">Passstifttiefe<input id="pin-depth" type="number" min="0.1" max="100" step="any" value="8"><i>mm</i></label>
+        <label class="wide-field">Randabstand<input id="edge-offset" type="number" min="0.1" max="250" step="any" value="8"><i>mm</i></label>
+        <p class="hint">Ungewindete Bohrungen zur Verbindung und Ausrichtung der Formhälften. Schrauben, Passstifte und andere Hardware werden nicht erzeugt.</p>
+        <p class="hint">Randabstand bis zur Bohrungsmitte; Passstifttiefe je Formhälfte. Mindestens 1 mm Restwand und Restboden werden geprüft.</p>
+      </section>
+      <section id="panel-6" class="step-panel" aria-labelledby="step-6" tabindex="-1" hidden>
+        <h2 class="section-title">06 · KEILANSÄTZE</h2>
+        <label class="checkbox-field"><input id="wedge-enabled" type="checkbox"> Trennkeil-Aufnahmen aktivieren</label>
+        <label class="wide-field">Seiten<select id="wedge-count"><option value="2" selected>2 · gegenüberliegende X-Seiten</option><option value="4">4 · alle Seiten</option></select></label>
+        <label class="wide-field">Breite<input id="wedge-width" type="number" min="0.1" max="200" step="any" value="12"><i>mm</i></label>
+        <label class="wide-field">Tiefe<input id="wedge-depth" type="number" min="0.1" max="100" step="any" value="5"><i>mm</i></label>
+        <label class="wide-field">Höhe<input id="wedge-height" type="number" min="0.1" max="100" step="any" value="4"><i>mm</i></label>
+        <p class="hint">Seitliche dreieckige Aufnahmen an der Anlagefläche zum Ansetzen eines Trennkeils. Zwei Aufnahmen liegen an den X-Seiten, vier an allen Seiten. Es werden keine losen Keile erzeugt.</p>
+      </section>
+      <nav class="step-navigation" aria-label="Schrittnavigation"><button id="step-back" disabled>← Zurück</button><span id="step-progress" aria-live="polite">1 / 6</span><button id="step-next" disabled>Weiter →</button></nav>
+      <section class="build-area" aria-label="Berechnung und Export">
       <div class="divider"></div>
-      <div class="section-title">FORMPARAMETER</div>
-      <label class="wide-field">Werkzeugwandstärke<input id="wall" type="number" min="1" max="500" step="1" value="20"><i>mm</i></label>
-      <label class="wide-field">Trennebene Z<input id="split" type="number" step="1" value="0"><i>mm</i></label>
-      <p class="hint">Die Unterform ist nach oben offen. Die Oberform ist ein positiver Stempel mit Trägerplatte; gezeigt wird die CAD-Sollform ohne Materialverdichtungssimulation.</p>
+      <p class="hint" id="mold-info" aria-live="polite"></p>
+      <p class="hint" id="feature-summary" aria-live="polite">Noch keine Form berechnet.</p>
       <button id="build" class="primary full" disabled>Form berechnen <span>→</span></button>
       <div class="divider"></div>
       <div class="section-title">SEGMENTE</div>
       <div id="segments" class="segments"><span class="muted">Noch nicht berechnet</span></div>
       <div class="export-row"><button data-export="lower" disabled>Unterform STEP ↓</button><button data-export="upper" disabled>Oberform STEP ↓</button></div>
       <button data-export="assembly" disabled class="secondary full">Baugruppe STEP exportieren</button>
+      </section>
     </aside>
   </main>
   <footer><span id="status">Bereit</span><span>Alle Maße in mm · CAD-Berechnung lokal · STEP-Export als B-Rep</span></footer>
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import threading
 import tempfile
 import zipfile
@@ -25,6 +26,7 @@ from forged_carbon_mold.cad import (
     mesh,
     model_info,
 )
+from forged_carbon_mold.features import ConnectionParameters, WedgeParameters, apply_mold_features
 
 STATIC_DIR = Path(__file__).parent / "static"
 MAX_STEP_BYTES = 100 * 1024 * 1024
@@ -38,16 +40,31 @@ _source_name = "Bauteil.step"
 _mold: MoldResult | None = None
 _revision = 0
 _wall_mm = 20.0
-_split_z: float | None = None
+_punch_depth_mm = 10.0
+_connections = ConnectionParameters()
+_wedges = WedgeParameters()
+_base_mold: MoldResult | None = None
+_base_mold_wall: float | None = None
 _transform = {"x": 0.0, "y": 0.0, "z": 0.0, "rx": 0.0, "ry": 0.0, "rz": 0.0}
 
 
 class Parameters(BaseModel):
-    wall_mm: float = Field(gt=0, le=500)
-    split_z: float
+    model_config = {"extra": "forbid"}
+    wall_mm: float = Field(gt=0, le=500, allow_inf_nan=False)
+    punch_depth_mm: float = Field(gt=0, le=500, allow_inf_nan=False)
+    connections: ConnectionParameters = Field(default_factory=ConnectionParameters)
+    wedges: WedgeParameters = Field(default_factory=WedgeParameters)
+
+
+def _parameters() -> dict:
+    return {
+        "wall_mm": _wall_mm, "punch_depth_mm": _punch_depth_mm,
+        "connections": _connections.model_dump(), "wedges": _wedges.model_dump(),
+    }
 
 
 class Transform(BaseModel):
+    model_config = {"allow_inf_nan": False}
     x: float = Field(ge=-100_000, le=100_000)
     y: float = Field(ge=-100_000, le=100_000)
     z: float = Field(ge=-100_000, le=100_000)
@@ -60,6 +77,16 @@ def _require_part() -> cq.Shape:
     if _part is None:
         raise HTTPException(status_code=409, detail="Bitte zuerst eine STEP-Datei importieren.")
     return _part
+
+
+def _segments(result: MoldResult) -> list[dict]:
+    return [
+        {"id": kind, "name": name, "solid_count": len(shape.Solids()), "volume_mm3": shape.Volume()}
+        for kind, name, shape in (
+            ("lower", "Unterform", result.lower),
+            ("upper", "Oberstempel", result.upper),
+        )
+    ]
 
 
 def _bytes_to_shape(data: bytes, suffix: str) -> cq.Shape:
@@ -90,15 +117,18 @@ async def status() -> dict:
             "revision": _revision,
             "part": info.__dict__ if info else None,
             "mold_ready": _mold is not None,
+            "segments": _segments(_mold) if _mold is not None else [],
             "source_name": _source_name if _part is not None else None,
-            "parameters": {"wall_mm": _wall_mm, "split_z": _split_z},
+            "parameters": _parameters(),
+            "features": dict(_mold.features) if _mold else {},
+            "split_z": info.bounds_max_mm["z"] + _punch_depth_mm if info else None,
             "transform": dict(_transform),
         }
 
 
 @app.post("/api/import")
 async def upload_step(file: UploadFile = File(...)) -> dict:
-    global _part, _base_part, _source_step, _source_name, _mold, _revision, _split_z
+    global _part, _base_part, _source_step, _source_name, _mold, _revision
     name = Path(file.filename or "").name
     if Path(name).suffix.lower() not in {".step", ".stp"}:
         raise HTTPException(status_code=400, detail="Bitte eine .step- oder .stp-Datei auswählen.")
@@ -115,7 +145,6 @@ async def upload_step(file: UploadFile = File(...)) -> dict:
         _source_name = name
         _mold = None
         _revision += 1
-        _split_z = (shape.BoundingBox().zmin + shape.BoundingBox().zmax) / 2
         for key in _transform:
             _transform[key] = 0.0
         return {"revision": _revision, "model": model_info(shape).__dict__}
@@ -123,7 +152,7 @@ async def upload_step(file: UploadFile = File(...)) -> dict:
 
 @app.post("/api/demo")
 async def create_demo() -> dict:
-    global _part, _base_part, _source_step, _source_name, _mold, _revision, _split_z
+    global _part, _base_part, _source_step, _source_name, _mold, _revision
     def make_fixture() -> tuple[cq.Shape, bytes]:
         demo = cq.Workplane("XY").box(80, 48, 24).val()
         with tempfile.TemporaryDirectory() as directory:
@@ -136,8 +165,6 @@ async def create_demo() -> dict:
     with _lock:
         _part, _base_part, _source_step, _source_name, _mold = shape, shape, data, "Referenzkörper.step", None
         _revision += 1
-        box = shape.BoundingBox()
-        _split_z = (box.zmin + box.zmax) / 2
         for key in _transform:
             _transform[key] = 0.0
         return {"revision": _revision, "model": model_info(shape).__dict__}
@@ -145,7 +172,7 @@ async def create_demo() -> dict:
 
 @app.post("/api/transform")
 async def set_transform(values: Transform) -> dict:
-    global _part, _mold, _revision, _transform, _split_z
+    global _part, _mold, _revision, _transform
     _require_part()
     with _lock:
         original = _base_part
@@ -159,37 +186,60 @@ async def set_transform(values: Transform) -> dict:
         _transform = values.model_dump()
         _mold = None
         _revision += 1
-        bounds = updated.BoundingBox()
-        if _split_z is None or not bounds.zmin < _split_z < bounds.zmax:
-            _split_z = (bounds.zmin + bounds.zmax) / 2
         return {"revision": _revision, "model": model_info(updated).__dict__}
 
 
 @app.post("/api/build")
 async def build(parameters: Parameters) -> dict:
-    global _mold, _wall_mm, _split_z
-    part = _require_part()
+    global _mold, _wall_mm, _punch_depth_mm, _connections, _wedges, _base_mold, _base_mold_wall, _revision
+    with _lock:
+        part = _require_part()
+        revision = _revision
+        cached = _base_mold if (
+            _base_mold is not None and _base_mold.part is part
+            and _base_mold_wall == parameters.wall_mm
+            and _base_mold.punch_depth_mm == parameters.punch_depth_mm
+        ) else None
     try:
-        result = await run_in_threadpool(
+        base = cached or await run_in_threadpool(
             build_two_piece_mold,
             part,
             wall_mm=parameters.wall_mm,
-            split_z=parameters.split_z,
+            punch_depth_mm=parameters.punch_depth_mm,
         )
+        with _lock:
+            if part is not _part or revision != _revision:
+                raise HTTPException(status_code=409, detail="Projekt wurde während der Berechnung geändert. Bitte erneut berechnen.")
+            _base_mold, _base_mold_wall = base, parameters.wall_mm
+        result = await run_in_threadpool(apply_mold_features, base, parameters.connections, parameters.wedges)
     except CadError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     with _lock:
-        if part is not _part:
+        if part is not _part or revision != _revision:
             raise HTTPException(status_code=409, detail="Bauteil wurde während der Berechnung geändert. Bitte erneut berechnen.")
-        _mold, _wall_mm, _split_z = result, parameters.wall_mm, parameters.split_z
+        _mold, _wall_mm, _punch_depth_mm = result, parameters.wall_mm, parameters.punch_depth_mm
+        _connections, _wedges = parameters.connections, parameters.wedges
+        _revision += 1
         return {
             "revision": _revision,
-            "segments": [
-                {"id": "lower", "name": "Unterform", "solid_count": len(result.lower.Solids()), "volume_mm3": result.lower.Volume()},
-                {"id": "upper", "name": "Oberstempel", "solid_count": len(result.upper.Solids()), "volume_mm3": result.upper.Volume()},
-            ],
+            "segments": _segments(result),
             "split_z": result.split_z,
+            "punch_depth_mm": result.punch_depth_mm,
+            "features": result.features,
         }
+
+
+@app.put("/api/parameters")
+async def update_parameters(parameters: Parameters) -> dict:
+    global _mold, _wall_mm, _punch_depth_mm, _connections, _wedges, _revision
+    with _lock:
+        _require_part()
+        if parameters.model_dump() != _parameters():
+            _wall_mm, _punch_depth_mm = parameters.wall_mm, parameters.punch_depth_mm
+            _connections, _wedges = parameters.connections, parameters.wedges
+            _mold = None
+            _revision += 1
+        return {"revision": _revision, "parameters": _parameters(), "mold_ready": _mold is not None}
 
 
 @app.get("/api/mesh/{kind}")
@@ -240,11 +290,13 @@ async def save_project() -> Response:
             raise HTTPException(status_code=409, detail="Die ursprüngliche STEP-Datei ist nicht verfügbar.")
         project = {
             "format": "forged-carbon-mold",
-            "version": 1,
+            "version": 3,
             "source_name": _source_name,
             "wall_mm": _wall_mm,
-            "split_z": _split_z,
-            "transform": _transform,
+            "punch_depth_mm": _punch_depth_mm,
+            "connections": _connections.model_dump(),
+            "wedges": _wedges.model_dump(),
+            "transform": dict(_transform),
             "source_step_base64": base64.b64encode(_source_step).decode("ascii"),
         }
     buffer = io.BytesIO()
@@ -259,32 +311,46 @@ async def save_project() -> Response:
 
 @app.post("/api/project")
 async def open_project(file: UploadFile = File(...)) -> dict:
-    global _part, _base_part, _source_step, _source_name, _mold, _revision, _wall_mm, _split_z, _transform
-    data = await file.read(MAX_STEP_BYTES + 1024 * 1024)
-    if len(data) > MAX_STEP_BYTES + 1024 * 1024:
+    global _part, _base_part, _source_step, _source_name, _mold, _revision, _wall_mm, _punch_depth_mm, _transform, _connections, _wedges
+    max_project_bytes = 4 * ((MAX_STEP_BYTES + 2) // 3) + 1024 * 1024
+    data = await file.read(max_project_bytes + 1)
+    if len(data) > max_project_bytes:
         raise HTTPException(status_code=413, detail="Projektdatei ist zu groß.")
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             if archive.namelist() != ["project.json"]:
                 raise ValueError("Unerwartete Projektdatei-Inhalte.")
+            if archive.getinfo("project.json").file_size > max_project_bytes:
+                raise ValueError("Entpackte Projektdatei ist zu groß.")
             project = json.loads(archive.read("project.json"))
-        if project.get("format") != "forged-carbon-mold" or project.get("version") != 1:
+        if not isinstance(project, dict) or project.get("format") != "forged-carbon-mold" or project.get("version") not in {1, 2, 3}:
             raise ValueError("Unbekanntes Projektformat oder nicht unterstützte Version.")
         source = base64.b64decode(project["source_step_base64"], validate=True)
         name = Path(project["source_name"]).name
         if Path(name).suffix.lower() not in {".step", ".stp"} or len(source) > MAX_STEP_BYTES:
             raise ValueError("Ungültige Quelldatei im Projekt.")
-        base_shape = await run_in_threadpool(_bytes_to_shape, source, Path(name).suffix.lower())
         transform = Transform(**project["transform"]).model_dump()
+        legacy = project["version"] == 1
+        if legacy and not math.isfinite(float(project["split_z"])):
+            raise ValueError("Ungültige Trennebene im alten Projekt.")
+        parameters = Parameters(
+            wall_mm=project["wall_mm"],
+            punch_depth_mm=10.0 if legacy else project["punch_depth_mm"],
+            connections=project["connections"] if project["version"] == 3 else ConnectionParameters(),
+            wedges=project["wedges"] if project["version"] == 3 else WedgeParameters(),
+        )
+        wall, depth = parameters.wall_mm, parameters.punch_depth_mm
+        base_shape = await run_in_threadpool(_bytes_to_shape, source, Path(name).suffix.lower())
         shape = await run_in_threadpool(_apply_transform, base_shape, transform)
-        wall = float(project["wall_mm"])
-        split = float(project["split_z"])
-        if not 0 < wall <= 500:
-            raise ValueError("Ungültige Wandstärke im Projekt.")
-    except (OSError, KeyError, TypeError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
+    except (OSError, KeyError, TypeError, ValueError, RuntimeError, NotImplementedError, zipfile.BadZipFile) as exc:
         raise HTTPException(status_code=422, detail=f"Projektdatei kann nicht geöffnet werden: {exc}") from exc
     with _lock:
         _part, _base_part, _source_step, _source_name, _mold = shape, base_shape, source, name, None
-        _wall_mm, _split_z, _transform = wall, split, transform
+        _wall_mm, _punch_depth_mm, _transform = wall, depth, transform
+        _connections, _wedges = parameters.connections, parameters.wedges
         _revision += 1
-        return {"revision": _revision, "model": model_info(shape).__dict__, "parameters": {"wall_mm": wall, "split_z": split}}
+        return {
+            "revision": _revision, "model": model_info(shape).__dict__,
+            "parameters": _parameters(),
+            "migrated": legacy,
+        }

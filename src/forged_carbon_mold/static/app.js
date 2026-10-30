@@ -10,6 +10,99 @@ let currentMode = "part";
 let cached = {};
 let meshGeneration = 0;
 const meshRequests = {};
+let currentStep = 1;
+let hasModel = false;
+let persistedParameters = null;
+let parameterRevision = 0;
+const parameterFields = {
+  wall_mm: "wall", punch_depth_mm: "punch-depth",
+  connections: { mode: "connection-mode", bolt_diameter_mm: "bolt-diameter", pin_diameter_mm: "pin-diameter", pin_depth_mm: "pin-depth", edge_offset_mm: "edge-offset" },
+  wedges: { enabled: "wedge-enabled", count: "wedge-count", width_mm: "wedge-width", depth_mm: "wedge-depth", height_mm: "wedge-height" },
+};
+const parameterDefaults = {
+  wall_mm: 20, punch_depth_mm: 10,
+  connections: { mode: "none", bolt_diameter_mm: 6, pin_diameter_mm: 4, pin_depth_mm: 8, edge_offset_mm: 8 },
+  wedges: { enabled: false, count: 2, width_mm: 12, depth_mm: 5, height_mm: 4 },
+};
+
+function readParameters(fields = parameterFields) {
+  return Object.fromEntries(Object.entries(fields).map(([key, field]) => {
+    if (typeof field === "object") return [key, readParameters(field)];
+    const input = document.getElementById(field);
+    return [key, input.type === "checkbox" ? input.checked : key === "mode" ? input.value : Number(input.value)];
+  }));
+}
+
+function writeParameters(parameters, fields = parameterFields) {
+  for (const [key, field] of Object.entries(fields)) {
+    if (typeof field === "object") writeParameters(parameters[key], field);
+    else {
+      const input = document.getElementById(field);
+      if (input.type === "checkbox") input.checked = parameters[key];
+      else input.value = parameters[key];
+    }
+  }
+}
+
+function parametersDirty() {
+  return persistedParameters !== JSON.stringify(readParameters());
+}
+
+function selectStep(step, focus = false) {
+  if (step < 1 || step > 6 || (step > 1 && !hasModel)) return;
+  currentStep = step;
+  for (const button of document.querySelectorAll("[data-step]")) {
+    const selected = Number(button.dataset.step) === step;
+    button.disabled = Number(button.dataset.step) > 1 && !hasModel;
+    button.parentElement.classList.toggle("active", selected);
+    if (selected) button.setAttribute("aria-current", "step");
+    else button.removeAttribute("aria-current");
+    document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
+  }
+  $("#step-back").disabled = step === 1;
+  $("#step-next").disabled = !hasModel || step === 6;
+  $("#step-progress").textContent = `${step} / 6`;
+  if (focus) document.getElementById(`panel-${step}`).focus();
+}
+
+function validateParameters() {
+  for (const input of document.querySelectorAll(".step-panel input[type=number], .step-panel select")) {
+    if (["tx", "ty", "tz", "rx", "ry", "rz"].includes(input.id)) continue;
+    if (input.value === "" || (input.type === "number" && !Number.isFinite(Number(input.value))) || !input.checkValidity()) {
+      selectStep(Number(input.closest(".step-panel").id.split("-")[1]));
+      input.focus();
+      input.reportValidity();
+      message("Bitte einen gültigen Parameter innerhalb der angegebenen Grenzen eingeben.", true);
+      return false;
+    }
+  }
+  return true;
+}
+
+function showFeatures(features) {
+  $("#feature-summary").textContent = features
+    ? `${features.bolt_holes ?? 0} Schraubenbohrungen · ${features.pin_pairs ?? 0} Passstiftpaare · ${features.wedge_slots ?? 0} Trennkeil-Aufnahmen`
+    : "Keine Feature-Zählung verfügbar.";
+}
+
+function invalidateMold() {
+  for (const button of document.querySelectorAll("[data-export]")) button.disabled = true;
+  for (const mode of ["lower", "upper", "mold", "both"]) $("#show-" + mode).disabled = true;
+  $("#segments").innerHTML = '<span class="muted">Parameter geändert — neu berechnen</span>';
+  $("#mold-info").textContent = "Geänderte Parameter werden mit „Form berechnen“ angewendet.";
+  $("#feature-summary").textContent = "Neu berechnen erforderlich.";
+  disposeMeshes();
+  if (hasModel) setViewMode("part");
+  message("Formparameter geändert — bitte neu berechnen");
+}
+
+for (const button of document.querySelectorAll("[data-step]")) {
+  button.addEventListener("click", () => selectStep(Number(button.dataset.step), true));
+}
+$("#step-back").addEventListener("click", () => selectStep(currentStep - 1, true));
+$("#step-next").addEventListener("click", () => selectStep(currentStep + 1, true));
+$("#import-picker").addEventListener("click", () => $("#step-file").click());
+$("#import-demo").addEventListener("click", () => $("#demo").click());
 
 function createRenderer(context) {
   const isWebGL2 = typeof WebGL2RenderingContext !== "undefined"
@@ -224,7 +317,10 @@ async function request(path, options = {}) {
   const response = await fetch(path, options);
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
-    try { detail = (await response.json()).detail || detail; } catch {}
+    try {
+      const error = (await response.json()).detail;
+      detail = Array.isArray(error) ? error.map(item => `${item.loc.at(-1)}: ${item.msg}`).join("; ") : error || detail;
+    } catch {}
     throw new Error(detail);
   }
   return response;
@@ -471,6 +567,13 @@ function draw() {
         message(error.message, true);
       }
     }
+    // Edge attributes may still reference buffers disposed by an import or
+    // rebuild. Disable them before drawing the next surface mesh.
+    if (edgeRenderer) {
+      for (const attribute of [edgeRenderer.position, edgeRenderer.normalA, edgeRenderer.normalB, edgeRenderer.feature]) {
+        gl.disableVertexAttribArray(attribute);
+      }
+    }
     gl.useProgram(renderer.program);
     const center = visible[0][1].center;
     const extent = Math.max(...visible.map(([, mesh]) => {
@@ -552,6 +655,8 @@ async function loadMesh(kind) {
 }
 
 function showModel(model, name) {
+  hasModel = true;
+  selectStep(currentStep);
   $("#model-name").textContent = name;
   $("#empty-state").classList.add("hidden");
   $("#dimensions").textContent = Object.entries(model.bounds_mm).map(([axis, value]) => `${axis.toUpperCase()} ${value.toFixed(1)}`).join(" · ") + " mm";
@@ -559,14 +664,8 @@ function showModel(model, name) {
   $("#apply-transform").disabled = false;
   $("#build").disabled = false;
   $("#show-part").disabled = false;
-  $("#show-lower").disabled = true;
-  $("#show-upper").disabled = true;
-  $("#show-mold").disabled = true;
-  $("#show-both").disabled = true;
   $("#transparent-toggle").disabled = false;
   $("#grid-toggle").disabled = false;
-  $("#split").value = $("#split").value || 0;
-  setViewMode("part");
 }
 
 async function importFile(file) {
@@ -578,36 +677,49 @@ async function importFile(file) {
     const result = await (await request("/api/import", { method: "POST", body: form })).json();
     disposeMeshes();
     showModel(result.model, file.name);
-    $("#split").value = "0";
     await refreshStatus();
     message("STEP importiert und geprüft");
   } catch (error) { message(error.message, true); }
 }
 
-async function refreshStatus() {
+async function refreshStatus({ resetParameters = false } = {}) {
   const response = await request("/api/status");
   const current = await response.json();
   if (current.part) {
     showModel(current.part, current.source_name);
     await loadMesh("part");
   }
-  $("#wall").value = current.parameters.wall_mm;
-  $("#split").value = current.parameters.split_z ?? 0;
+  const keepEdits = !resetParameters && persistedParameters !== null && parametersDirty();
+  const parameters = {
+    ...parameterDefaults, ...current.parameters,
+    connections: { ...parameterDefaults.connections, ...current.parameters?.connections },
+    wedges: { ...parameterDefaults.wedges, ...current.parameters?.wedges },
+  };
+  if (!keepEdits) writeParameters(parameters);
+  persistedParameters = JSON.stringify(parameters);
+  $("#mold-info").textContent = current.split_z == null ? "" : `Anlagefläche bei Z ${current.split_z.toFixed(1)} mm`;
   for (const [key, value] of Object.entries(current.transform || {})) {
     const input = document.getElementById(key === "x" || key === "y" || key === "z" ? `t${key}` : key);
     if (input) input.value = value;
   }
-  if (current.mold_ready) {
+  if (current.mold_ready && !parametersDirty()) {
+    showSegments(current.segments);
+    showFeatures(current.features);
     $("#show-lower").disabled = false;
     $("#show-upper").disabled = false;
     $("#show-mold").disabled = false;
     $("#show-both").disabled = false;
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = false;
+    await setViewMode(currentMode);
   } else {
     $("#show-lower").disabled = true;
     $("#show-upper").disabled = true;
     $("#show-mold").disabled = true;
     $("#show-both").disabled = true;
+    for (const button of document.querySelectorAll("[data-export]")) button.disabled = true;
+    $("#segments").innerHTML = '<span class="muted">Neu berechnen erforderlich</span>';
+    $("#feature-summary").textContent = "Neu berechnen erforderlich.";
+    if (hasModel) await setViewMode("part");
   }
 }
 
@@ -615,12 +727,9 @@ $("#step-file").addEventListener("change", event => importFile(event.target.file
 $("#demo").addEventListener("click", async () => {
   try {
     message("Referenzkörper wird erzeugt …");
-    const response = await request("/api/demo", { method: "POST" });
-    const result = await response.json();
+    await request("/api/demo", { method: "POST" });
     disposeMeshes();
-    showModel(result.model, "Referenzkörper.step");
-    $("#split").value = "0";
-    await loadMesh("part");
+    await refreshStatus();
     message("Referenzkörper bereit");
   } catch (error) { message(error.message, true); }
 });
@@ -629,34 +738,49 @@ $("#apply-transform").addEventListener("click", async () => {
   const values = Object.fromEntries(["tx", "ty", "tz", "rx", "ry", "rz"].map(key => [key, Number($(`#${key}`).value)]));
   try {
     message("Transformation wird angewendet …");
-    const result = await (await request("/api/transform", {
+    await request("/api/transform", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ x: values.tx, y: values.ty, z: values.tz, rx: values.rx, ry: values.ry, rz: values.rz }),
-    })).json();
+    });
     disposeMeshes();
-    showModel(result.model, $("#model-name").textContent);
-    await loadMesh("part");
-    $("#show-lower").disabled = true;
-    $("#show-upper").disabled = true;
-    $("#show-mold").disabled = true;
-    $("#show-both").disabled = true;
-    for (const button of document.querySelectorAll("[data-export]")) button.disabled = true;
-    $("#segments").innerHTML = '<span class="muted">Neu berechnen erforderlich</span>';
+    await refreshStatus();
     message("Transformation angewendet — Form bitte neu berechnen");
   } catch (error) { message(error.message, true); }
 });
 
+function showSegments(segments) {
+  $("#segments").replaceChildren(...segments.map(segment => {
+    const article = document.createElement("article");
+    const name = document.createElement("span");
+    const details = document.createElement("small");
+    name.textContent = segment.name;
+    details.textContent = `${segment.solid_count} Körper · ${(segment.volume_mm3 / 1000).toFixed(1)} cm³`;
+    article.append(name, details);
+    return article;
+  }));
+}
+
 $("#build").addEventListener("click", async () => {
+  if ($("#build").disabled) return;
+  if (!validateParameters()) return;
+  const parameters = readParameters();
+  const revision = parameterRevision;
+  $("#build").disabled = true;
   try {
     message("B-Rep-Form wird berechnet …");
     const response = await request("/api/build", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wall_mm: Number($("#wall").value), split_z: Number($("#split").value) }),
+      body: JSON.stringify(parameters),
     });
     const result = await response.json();
-    $("#segments").innerHTML = result.segments.map(segment =>
-      `<article><span>${segment.name}</span><small>${segment.solid_count} Körper · ${(segment.volume_mm3 / 1000).toFixed(1)} cm³</small></article>`
-    ).join("");
+    persistedParameters = JSON.stringify(parameters);
+    if (revision !== parameterRevision) {
+      invalidateMold();
+      return;
+    }
+    $("#mold-info").textContent = `Anlagefläche bei Z ${result.split_z.toFixed(1)} mm · Stempeltiefe ${result.punch_depth_mm.toFixed(1)} mm`;
+    showSegments(result.segments);
+    showFeatures(result.features);
     $("#show-lower").disabled = false;
     $("#show-upper").disabled = false;
     $("#show-mold").disabled = false;
@@ -664,10 +788,18 @@ $("#build").addEventListener("click", async () => {
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = false;
     disposeMesh("lower");
     disposeMesh("upper");
-    await setViewMode(currentMode);
+    await setViewMode(currentMode === "part" ? "both" : currentMode);
     message("Form gültig berechnet");
   } catch (error) { message(error.message, true); }
+  finally { $("#build").disabled = false; }
 });
+
+for (const id of ["wall", "punch-depth", ...Object.values(parameterFields.connections), ...Object.values(parameterFields.wedges)]) {
+  $(`#${id}`).addEventListener("input", () => {
+    parameterRevision++;
+    invalidateMold();
+  });
+}
 
 async function setViewMode(mode) {
   currentMode = mode;
@@ -721,7 +853,16 @@ for (const button of document.querySelectorAll("[data-export]")) {
 }
 
 $("#save-project").addEventListener("click", async () => {
+  if (!validateParameters()) return;
   try {
+    const parameters = readParameters();
+    const dirty = parametersDirty();
+    await request("/api/parameters", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parameters),
+    });
+    persistedParameters = JSON.stringify(parameters);
+    if (dirty) invalidateMold();
     const response = await request("/api/project");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(await response.blob());
@@ -738,10 +879,10 @@ $("#project-file").addEventListener("change", async event => {
   const form = new FormData();
   form.append("file", file);
   try {
-    await request("/api/project", { method: "POST", body: form });
+    const result = await (await request("/api/project", { method: "POST", body: form })).json();
     disposeMeshes();
-    await refreshStatus();
-    message("Projekt geöffnet — Form neu berechnen");
+    await refreshStatus({ resetParameters: true });
+    message(result.migrated ? "Altes Projekt geöffnet — Stempeltiefe auf 10 mm gesetzt; Form neu berechnen" : "Projekt geöffnet — Form neu berechnen");
   } catch (error) { message(error.message, true); }
 });
 

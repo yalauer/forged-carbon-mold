@@ -37,26 +37,54 @@ Browser öffnen.
 - STEP/STP-Import, Prüfung auf gültige geschlossene Volumenkörper und Anzeige
   von Körperzahl, Abmessungen und Volumen.
 - Lokaler Referenzquader zum Ausprobieren ohne eigene CAD-Datei.
+- Sechs anklickbare Arbeitsschritte mit Zurück/Weiter. Nach dem Import sind
+  Bauteillage, Außenform, Stempeltiefe, Verbindungen und Keilansätze erreichbar.
 - Bauteilrotation X → Y → Z um den Ursprung und anschließende Translation;
   die Werkzeugachsen werden dabei nicht transformiert.
-- Quaderförmiger Rohling mit einstellbarer Wandstärke und ebener Teilung in
-  Unter- und Oberform.
+- Quaderförmiger Rohling mit einstellbarer Wandstärke und Stempeltiefe.
+  Das vollständige Bauteil liegt unterhalb der Anlagefläche in der Unterform.
+  Die Stempeltiefe ist der Abstand vom höchsten Bauteilpunkt zur Oberkante
+  der Unterform (Standard: 10 mm). Größere Werte erhöhen die Unterform und
+  verlängern den eintauchenden Stempel, ohne das Sollbauteil zu verändern.
 - GPU-beschleunigte interaktive WebGL-Vorschau der einmal geladenen
   CAD-Netze; Drehen und Zoomen aktualisieren nur die Ansicht, nicht erneut
   die Geometrie. Die Ansicht lässt sich mit invertierter Maussteuerung
   unbegrenzt in alle Richtungen drehen.
   Bauteil, Unterform, Oberform, Form oder Bauteil mit Form lassen sich
-  einzeln umschalten. Die Unterform ist als nach oben offene Aufnahme für die
-  Bauteilunterseite ausgeführt; die Oberform als positiver Stempel mit
-  Trägerplatte. Dies bildet die CAD-Sollgeometrie ab, simuliert aber keine
-  Materialverdichtung. Transparenz und
+  einzeln umschalten. Die Öffnung und der eintauchende Stempel folgen der
+  Z-Projektion der STEP-Geometrie, nicht ihrer rechteckigen Begrenzungsbox.
+  Nur die senkrechte Führungskontur wird polygonisiert (absolute
+  Netztoleranz 0,01 mm, Vereinfachung 0,005 mm) und um 0,05 mm nach innen
+  versetzt. Dieser Innenversatz ist kein Spiel zwischen den Werkzeughälften
+  und kann kleine Hinterschneidungen erzeugen; eine Entformungsprüfung ist
+  weiterhin erforderlich. Die formgebenden Flächen werden aus dem originalen
+  STEP-B-Rep geschnitten. Die Unterseite des Stempels bildet die Bauteiloberseite ab.
+  Die Trägerplatte liegt auf der Unterform auf. Der geschlossene Hohlraum
+  entspricht dem vollständigen Bauteil; Form und Bauteil überlagern sich
+  nicht. Dies simuliert keine Materialverdichtung. Transparenz und
   eine Konturansicht mit Außen- und scharfen Formkanten statt interner
   Dreiecksverbindungen sind zuschaltbar. Eine mit der Ansicht mitdrehende
   XYZ-Markierung zeigt die Achsenorientierung. Echter
   STEP-Export der beiden Segmente und der Baugruppe. Export prüft nach erneutem
   Einlesen Körperzahl, Volumen und Lage/Abmessungen.
+- Optionale Verbindungen: vier durchgehende Schraubbohrungen in den Ecken,
+  zwei gegenüberliegende blinde Passstiftbohrungspaare oder beides.
+  Durchmesser, Passstifttiefe und Abstand der Bohrungsmittelpunkte vom
+  Außenrand sind einstellbar. Bohrungen sind ungewindet; Hardware wird nicht
+  erzeugt. Mindestens 1 mm Restwand/-boden und Abstände werden geprüft.
+- Zwei Trennkeil-Aufnahmen an den X-Seiten oder vier an allen Werkzeugseiten,
+  mit einstellbarer Breite, radialer Tiefe und voller Öffnungshöhe. Sie sind
+  als dreieckige Aussparungen in beiden Hälften an der Anlagefläche ausgeführt.
+  Sie sind Öffnungshilfen, keine Führungskeile. Kollisionen mit Bohrungen werden
+  abgewiesen. Verbindungen und Keilaufnahmen sind standardmäßig ausgeschaltet.
 - Projektdatei `.fcm` mit den ursprünglichen STEP-Daten und den Parametern;
   beim Öffnen werden CAD-Körper erneut aus der Quelldatei rekonstruiert.
+  Neue Projekte speichern Stempeltiefe und Formoptionen im Format Version 3.
+  Version 2 wird ohne aktivierte Formoptionen geöffnet; Version 1 erhält
+  zusätzlich 10 mm Stempeltiefe statt der alten Trennebene. Geänderte Optionen
+  werden auch vor dem Berechnen gespeichert. Nach Parameteränderungen muss
+  die Form neu berechnet werden; Änderungen nur an Verbindungen/Keilaufnahmen
+  verwenden die bereits berechnete Grundform erneut.
 
 ## Tests
 
@@ -73,7 +101,7 @@ lokalen API-/Projekt-Rundlauf.
 Der belegte Umfang entspricht dem CAD-Machbarkeitstest M0 und einem lokalen
 vertikalen Durchlauf M1. Noch nicht implementiert sind unter anderem
 Mehrfachsegmentierung, Auswahl einzelner STEP-Körper oder topologischer
-Flächen/Kanten, 3D-Trennkonturen, Verbindungen, U-Aussparungen, Keilfasen,
+Flächen/Kanten, 3D-Trennkonturen, Gewinde/Normteil-Hardware, U-Aussparungen, Keilfasen,
 Entformungsprüfung, Undo/Redo und langlebige Projektverwaltung. Die aktuelle
 ebene Trennung ist keine Ersatzimplementierung für räumliche Trennkonturen.
 Es gibt keine automatische Festigkeits-, Temperatur-, Entformungs- oder
