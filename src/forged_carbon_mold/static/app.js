@@ -424,6 +424,16 @@ function disposeMeshes() {
   cached = {};
 }
 
+function disposeMesh(kind) {
+  const mesh = cached[kind];
+  if (!mesh) return;
+  gl.deleteBuffer(mesh.positionBuffer);
+  gl.deleteBuffer(mesh.normalBuffer);
+  gl.deleteBuffer(mesh.indexBuffer);
+  if (mesh.edgeBuffer) gl.deleteBuffer(mesh.edgeBuffer);
+  delete cached[kind];
+}
+
 let framePending = false;
 function draw() {
   if (!gl || !renderer) return;
@@ -638,7 +648,9 @@ $("#build").addEventListener("click", async () => {
     $("#show-mold").disabled = false;
     $("#show-both").disabled = false;
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = false;
-    await setViewMode("mold");
+    disposeMesh("lower");
+    disposeMesh("upper");
+    await setViewMode(currentMode);
     message("Form gültig berechnet");
   } catch (error) { message(error.message, true); }
 });
