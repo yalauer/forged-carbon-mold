@@ -43,7 +43,8 @@ Browser öffnen.
   Unter- und Oberform.
 - GPU-beschleunigte interaktive WebGL-Vorschau der einmal geladenen
   CAD-Netze; Drehen und Zoomen aktualisieren nur die Ansicht, nicht erneut
-  die Geometrie. Die Ansicht wird mit invertierter Maussteuerung gedreht.
+  die Geometrie. Die Ansicht lässt sich mit invertierter Maussteuerung
+  unbegrenzt in alle Richtungen drehen.
   Bauteil, Form oder beide zusammen lassen sich umschalten; Transparenz und
   eine Konturansicht mit Außen- und scharfen Formkanten statt interner
   Dreiecksverbindungen sind zuschaltbar. Eine mit der Ansicht mitdrehende

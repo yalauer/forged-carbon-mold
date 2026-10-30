@@ -715,7 +715,7 @@ canvas.addEventListener("pointerdown", event => { view.dragging = true; view.las
 canvas.addEventListener("pointermove", event => {
   if (!view.dragging) return;
   view.azimuth -= (event.clientX - view.lastX) * 0.008;
-  view.elevation = Math.max(-1.45, Math.min(1.45, view.elevation - (event.clientY - view.lastY) * 0.008));
+  view.elevation -= (event.clientY - view.lastY) * 0.008;
   view.lastX = event.clientX; view.lastY = event.clientY; draw();
 });
 canvas.addEventListener("pointerup", () => { view.dragging = false; });
