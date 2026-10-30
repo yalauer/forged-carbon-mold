@@ -21,6 +21,8 @@ def test_local_mold_project_roundtrip_and_exports() -> None:
     built = client.post("/api/build", json={"wall_mm": 20, "split_z": 0})
     assert built.status_code == 200
     assert {segment["id"] for segment in built.json()["segments"]} == {"lower", "upper"}
+    assert client.get("/api/mesh/lower").json()["triangles"]
+    assert client.get("/api/mesh/upper").json()["triangles"]
 
     for segment in ("lower", "upper", "assembly"):
         exported = client.get(f"/api/export/{segment}")

@@ -73,8 +73,8 @@ def build_two_piece_mold(
     if min(box.xlen, box.ylen, box.zlen) <= 0:
         raise CadError("Das Bauteil besitzt eine leere Begrenzungsbox.")
     split = (box.zmin + box.zmax) / 2 if split_z is None else split_z
-    if not math.isfinite(split) or not box.zmin - wall_mm < split < box.zmax + wall_mm:
-        raise CadError("Die Trennebene muss innerhalb des Rohlings liegen.")
+    if not math.isfinite(split) or not box.zmin < split < box.zmax:
+        raise CadError("Die Trennebene muss innerhalb des Bauteils liegen, damit Unterform und Stempel wirksam sind.")
     blank = cq.Workplane("XY").box(
         box.xlen + 2 * wall_mm,
         box.ylen + 2 * wall_mm,
@@ -112,9 +112,23 @@ def build_two_piece_mold(
             )
         ).val()
         lower = cavity_blank.intersect(lower_limit)
-        upper = cavity_blank.intersect(upper_limit)
+        upper_tip = part.intersect(upper_limit)
+        punch_embed = min(wall_mm, (box.zmax - split) * 0.5)
+        head_bottom = box.zmax - punch_embed
+        upper_head = cq.Workplane("XY").box(
+            box.xlen + 2 * wall_mm,
+            box.ylen + 2 * wall_mm,
+            box.zmax + wall_mm - head_bottom,
+        ).translate(
+            (
+                (box.xmin + box.xmax) / 2,
+                (box.ymin + box.ymax) / 2,
+                (box.zmax + wall_mm + head_bottom) / 2,
+            )
+        ).val()
+        upper = upper_tip.fuse(upper_head).clean()
     except Exception as exc:
-        raise CadError(f"Formherstellung oder Teilung fehlgeschlagen: {exc}") from exc
+        raise CadError(f"Formherstellung oder Stempelkonstruktion fehlgeschlagen: {exc}") from exc
     if any(not shape.isValid() or shape.Volume() <= 0 for shape in (lower, upper)):
         raise CadError("Die Teilung erzeugt ein leeres oder ungültiges Formsegment.")
     return MoldResult(

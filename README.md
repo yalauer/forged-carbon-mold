@@ -45,7 +45,11 @@ Browser öffnen.
   CAD-Netze; Drehen und Zoomen aktualisieren nur die Ansicht, nicht erneut
   die Geometrie. Die Ansicht lässt sich mit invertierter Maussteuerung
   unbegrenzt in alle Richtungen drehen.
-  Bauteil, Form oder beide zusammen lassen sich umschalten; Transparenz und
+  Bauteil, Unterform, Oberform, Form oder Bauteil mit Form lassen sich
+  einzeln umschalten. Die Unterform ist als nach oben offene Aufnahme für die
+  Bauteilunterseite ausgeführt; die Oberform als positiver Stempel mit
+  Trägerplatte. Dies bildet die CAD-Sollgeometrie ab, simuliert aber keine
+  Materialverdichtung. Transparenz und
   eine Konturansicht mit Außen- und scharfen Formkanten statt interner
   Dreiecksverbindungen sind zuschaltbar. Eine mit der Ansicht mitdrehende
   XYZ-Markierung zeigt die Achsenorientierung. Echter

@@ -447,13 +447,17 @@ function draw() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const meshes = currentMode === "part"
       ? [["part", cached.part, [0.64, 0.875, 0.435]]]
-      : currentMode === "mold"
-        ? [["lower", cached.lower, [0.75, 0.79, 0.75]], ["upper", cached.upper, [0.66, 0.72, 0.67]]]
-        : [
-          ["part", cached.part, [0.64, 0.875, 0.435]],
-          ["lower", cached.lower, [0.75, 0.79, 0.75]],
-          ["upper", cached.upper, [0.66, 0.72, 0.67]],
-        ];
+      : currentMode === "lower"
+        ? [["lower", cached.lower, [0.75, 0.79, 0.75]]]
+        : currentMode === "upper"
+          ? [["upper", cached.upper, [0.66, 0.72, 0.67]]]
+            : currentMode === "mold"
+              ? [["lower", cached.lower, [0.75, 0.79, 0.75]], ["upper", cached.upper, [0.66, 0.72, 0.67]]]
+              : [
+                ["part", cached.part, [0.64, 0.875, 0.435]],
+                ["lower", cached.lower, [0.75, 0.79, 0.75]],
+                ["upper", cached.upper, [0.66, 0.72, 0.67]],
+              ];
     const visible = meshes.filter(([, mesh]) => mesh);
     if (!visible.length || !width || !height) return;
     if (display.grid) {
@@ -555,6 +559,8 @@ function showModel(model, name) {
   $("#apply-transform").disabled = false;
   $("#build").disabled = false;
   $("#show-part").disabled = false;
+  $("#show-lower").disabled = true;
+  $("#show-upper").disabled = true;
   $("#show-mold").disabled = true;
   $("#show-both").disabled = true;
   $("#transparent-toggle").disabled = false;
@@ -592,10 +598,14 @@ async function refreshStatus() {
     if (input) input.value = value;
   }
   if (current.mold_ready) {
+    $("#show-lower").disabled = false;
+    $("#show-upper").disabled = false;
     $("#show-mold").disabled = false;
     $("#show-both").disabled = false;
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = false;
   } else {
+    $("#show-lower").disabled = true;
+    $("#show-upper").disabled = true;
     $("#show-mold").disabled = true;
     $("#show-both").disabled = true;
   }
@@ -626,6 +636,8 @@ $("#apply-transform").addEventListener("click", async () => {
     disposeMeshes();
     showModel(result.model, $("#model-name").textContent);
     await loadMesh("part");
+    $("#show-lower").disabled = true;
+    $("#show-upper").disabled = true;
     $("#show-mold").disabled = true;
     $("#show-both").disabled = true;
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = true;
@@ -645,6 +657,8 @@ $("#build").addEventListener("click", async () => {
     $("#segments").innerHTML = result.segments.map(segment =>
       `<article><span>${segment.name}</span><small>${segment.solid_count} Körper · ${(segment.volume_mm3 / 1000).toFixed(1)} cm³</small></article>`
     ).join("");
+    $("#show-lower").disabled = false;
+    $("#show-upper").disabled = false;
     $("#show-mold").disabled = false;
     $("#show-both").disabled = false;
     for (const button of document.querySelectorAll("[data-export]")) button.disabled = false;
@@ -657,7 +671,10 @@ $("#build").addEventListener("click", async () => {
 
 async function setViewMode(mode) {
   currentMode = mode;
-  for (const [id, buttonMode] of [["show-part", "part"], ["show-mold", "mold"], ["show-both", "both"]]) {
+  for (const [id, buttonMode] of [
+    ["show-part", "part"], ["show-lower", "lower"], ["show-upper", "upper"],
+    ["show-mold", "mold"], ["show-both", "both"],
+  ]) {
     const button = $(`#${id}`);
     const selected = mode === buttonMode;
     button.classList.toggle("selected", selected);
@@ -665,12 +682,17 @@ async function setViewMode(mode) {
   }
   try {
     if (mode === "part" || mode === "both") await loadMesh("part");
+    if (mode === "lower") await loadMesh("lower");
+    if (mode === "upper") await loadMesh("upper");
     if (mode === "mold" || mode === "both") await Promise.all([loadMesh("lower"), loadMesh("upper")]);
     draw();
   } catch (error) { message(error.message, true); }
 }
 
-for (const [id, mode] of [["show-part", "part"], ["show-mold", "mold"], ["show-both", "both"]]) {
+for (const [id, mode] of [
+  ["show-part", "part"], ["show-lower", "lower"], ["show-upper", "upper"],
+  ["show-mold", "mold"], ["show-both", "both"],
+]) {
   $(`#${id}`).addEventListener("click", () => setViewMode(mode));
 }
 

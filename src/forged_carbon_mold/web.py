@@ -186,7 +186,7 @@ async def build(parameters: Parameters) -> dict:
             "revision": _revision,
             "segments": [
                 {"id": "lower", "name": "Unterform", "solid_count": len(result.lower.Solids()), "volume_mm3": result.lower.Volume()},
-                {"id": "upper", "name": "Oberform", "solid_count": len(result.upper.Solids()), "volume_mm3": result.upper.Volume()},
+                {"id": "upper", "name": "Oberstempel", "solid_count": len(result.upper.Solids()), "volume_mm3": result.upper.Volume()},
             ],
             "split_z": result.split_z,
         }

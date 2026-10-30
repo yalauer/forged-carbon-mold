@@ -36,6 +36,8 @@
         <div class="view-controls" aria-label="3D-Ansichtsoptionen">
           <div class="view-modes">
             <button id="show-part" class="view-toggle selected" aria-pressed="true">Bauteil</button>
+            <button id="show-lower" class="view-toggle" aria-pressed="false" disabled>Unterform</button>
+            <button id="show-upper" class="view-toggle" aria-pressed="false" disabled>Oberstempel</button>
             <button id="show-mold" class="view-toggle" aria-pressed="false" disabled>Form</button>
             <button id="show-both" class="view-toggle" aria-pressed="false" disabled>Beides</button>
           </div>
@@ -78,7 +80,7 @@
       <div class="section-title">FORMPARAMETER</div>
       <label class="wide-field">Werkzeugwandstärke<input id="wall" type="number" min="1" max="500" step="1" value="20"><i>mm</i></label>
       <label class="wide-field">Trennebene Z<input id="split" type="number" step="1" value="0"><i>mm</i></label>
-      <p class="hint">Quader-Rohling mit fester Werkzeugausrichtung. Die Form wird aus dem Rohling und der unveränderten STEP-Geometrie ausgeschnitten.</p>
+      <p class="hint">Die Unterform ist nach oben offen. Die Oberform ist ein positiver Stempel mit Trägerplatte; gezeigt wird die CAD-Sollform ohne Materialverdichtungssimulation.</p>
       <button id="build" class="primary full" disabled>Form berechnen <span>→</span></button>
       <div class="divider"></div>
       <div class="section-title">SEGMENTE</div>
@@ -88,6 +90,6 @@
     </aside>
   </main>
   <footer><span id="status">Bereit</span><span>Alle Maße in mm · CAD-Berechnung lokal · STEP-Export als B-Rep</span></footer>
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>
